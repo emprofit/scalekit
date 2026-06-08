@@ -1,0 +1,150 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum PaymentProvider {
+  PAYSTACK
+  FLUTTERWAVE
+}
+
+enum OrderStatus {
+  PENDING
+  INITIALIZED
+  PAID
+  FAILED
+  CANCELLED
+  FULFILLED
+  PARTIALLY_FULFILLED
+}
+
+enum DeliveryStatus {
+  PENDING
+  PROCESSING
+  EMAILED
+  DOWNLOADED
+  REVOKED
+}
+
+model Order {
+  id              String           @id @default(cuid())
+  reference       String           @unique
+  email           String
+  currency        String           @default("NGN")
+  subtotalAmount  Int
+  status          OrderStatus      @default(PENDING)
+  provider        PaymentProvider?
+  paidAt          DateTime?
+  fulfilledAt     DateTime?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  items           OrderItem[]
+  payments        PaymentAttempt[]
+  webhookEvents   WebhookEvent[]
+
+  @@index([email])
+  @@index([status])
+}
+
+model OrderItem {
+  id                String         @id @default(cuid())
+  orderId           String
+  productId         String
+  productSlug       String
+  productTitle      String
+  unitAmount        Int
+  currency          String         @default("NGN")
+  deliveryStatus    DeliveryStatus @default(PENDING)
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  order             Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  downloadGrant     DownloadGrant?
+
+  @@index([orderId])
+  @@index([productId])
+}
+
+model PaymentAttempt {
+  id                 String          @id @default(cuid())
+  orderId            String
+  provider           PaymentProvider
+  providerReference  String          @unique
+  providerTxId       String?
+  amount             Int
+  currency           String          @default("NGN")
+  status             String
+  authorizationUrl   String?
+  accessCode         String?
+  rawInitialize      Json?
+  rawVerify          Json?
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  order              Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([provider, status])
+}
+
+model DownloadGrant {
+  id              String         @id @default(cuid())
+  orderItemId     String         @unique
+  email           String
+  token           String         @unique
+  downloadCount   Int            @default(0)
+  expiresAt       DateTime?
+  firstUsedAt     DateTime?
+  lastUsedAt      DateTime?
+  revokedAt       DateTime?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  accessChallenges DownloadAccessChallenge[]
+
+  orderItem       OrderItem      @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+
+  @@index([email])
+  @@index([token])
+}
+
+
+model DownloadAccessChallenge {
+  id             String       @id @default(cuid())
+  grantId        String
+  email          String
+  otpCodeHash    String
+  magicTokenHash String
+  expiresAt      DateTime
+  usedAt         DateTime?
+  createdAt      DateTime     @default(now())
+
+  grant          DownloadGrant @relation(fields: [grantId], references: [id], onDelete: Cascade)
+
+  @@index([grantId, email])
+  @@index([expiresAt])
+}
+
+
+
+model WebhookEvent {
+  id               String          @id @default(cuid())
+  dedupeKey        String?         @unique
+  orderId          String?
+  provider         PaymentProvider
+  eventType        String?
+  signatureValid   Boolean         @default(false)
+  payload          Json
+  processedAt      DateTime?
+  createdAt        DateTime        @default(now())
+
+  order            Order?          @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  @@index([provider])
+  @@index([processedAt])
+}

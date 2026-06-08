@@ -1,0 +1,27 @@
+node_modules/
+.next/
+out/
+dist/
+coverage/
+*.log
+
+.env
+.env.*
+!.env.example
+
+.DS_Store
+Thumbs.db
+
+_scalekit-backups/
+*backup*/
+*audit*.txt
+*inspection*.txt
+*report*.txt
+*repair*.txt
+configure-scalekit-catalog*.ps1
+replace-scalekit-footer.ps1
+resume-scalekit-catalog.ps1
+
+# Secure ScaleKit product packages are intentionally versioned for deployment.
+!vault-files/
+!vault-files/*.zip
